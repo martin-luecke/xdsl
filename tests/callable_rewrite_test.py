@@ -28,7 +28,6 @@ def rewrite_and_compare(prog: str, expected_prog: str,
 
 
 def test_initial():
-    """Test a simple non-recursive rewrite"""
 
     prog = \
 """module() {
@@ -55,7 +54,6 @@ def test_initial():
 
 
 def test_call_interface():
-    """Test a simple non-recursive rewrite"""
 
     prog = \
 """module() {
@@ -82,7 +80,6 @@ def test_call_interface():
 
 
 def test_rewrite_return_value():
-    """Test a simple non-recursive rewrite"""
 
     prog = \
 """module() {
@@ -114,8 +111,9 @@ def test_rewrite_return_value():
         prog, expected,
         PatternRewriteWalker(RewriteConst(), apply_recursively=False))
 
+
+# This test currently fails. I did not completely grasp the differences in rewriting yet.
 def test_seq():
-    """Test a simple non-recursive rewrite"""
 
     prog = \
 """module() {
