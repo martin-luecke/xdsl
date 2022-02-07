@@ -28,6 +28,7 @@ def rewrite_and_compare(prog: str, expected_prog: str,
 
 
 def test_initial():
+    """Test a simple non-recursive rewrite"""
 
     prog = \
 """module() {
@@ -112,8 +113,7 @@ def test_rewrite_return_value():
         PatternRewriteWalker(RewriteConst(), apply_recursively=False))
 
 
-# This test currently fails. I did not completely grasp the differences in rewriting yet.
-def test_seq():
+def test_two_consts():
 
     prog = \
 """module() {
@@ -128,15 +128,6 @@ def test_seq():
   %2 : !i32 = arith.addi(%0 : !i32, %0 : !i32)
 }"""
 
-    # class Seq(CallableRewritePattern):
-    #     s1: CallableRewritePattern
-    #     s2: CallableRewritePattern 
-        
-    #     def __call__(self, op: Operation, rewriter: PatternRewriter) -> Operation:
-    #         intermediate = s1()(op, rewriter)
-    #         if (isinstance(intermediate, Operation)):   # i.e. was s1 successful
-    #             return s2()(intermediate, rewriter)
-
     class CreateConst(CallableRewritePattern):
         def __call__(self, op: Operation, rewriter: PatternRewriter) -> Operation:
             if isinstance(op, Constant):
@@ -149,9 +140,58 @@ def test_seq():
             if isinstance(op, Constant):
                 new_constant0 = CreateConst()(op, rewriter)
                 new_constant1 = CreateConst()(op, rewriter)
-                rewriter.insert_op_after(new_constant1, op)
+                # rewriter.insert_op_after(new_constant1, op) does not work, but should. Instead:
+                rewriter.insert_op_after_matched_op(new_constant1)
                 rewriter.replace_matched_op([new_constant0])
                 return new_constant0
+
+    rewrite_and_compare(
+        prog, expected,
+        PatternRewriteWalker(RewriteConst(), apply_recursively=False))
+
+
+def test_seq():
+
+    prog = \
+"""module() {
+%0 : !i32 = arith.constant() ["value" = 42 : !i32]
+%1 : !i32 = arith.addi(%0 : !i32, %0 : !i32)
+}"""
+
+    expected = \
+"""module() {
+  %0 : !i32 = arith.constant() ["value" = 43 : !i32]
+  %1 : !i32 = arith.constant() ["value" = 43 : !i32]
+  %2 : !i32 = arith.addi(%0 : !i32, %0 : !i32)
+}"""
+    @dataclass
+    class Seq(CallableRewritePattern):
+        s1: CallableRewritePattern
+        s2: CallableRewritePattern 
+
+        def __call__(self, op: Operation, rewriter: PatternRewriter) -> Operation:
+            intermediate = self.s1(op, rewriter)
+            if (isinstance(intermediate, Operation)):   # i.e. was s1 successful
+                # I have to call insert on the rewriter here or I lose the handle to it. 
+                # Inside rewrite s1 it is too early to decide whether I want to 
+                # insert the newly created op somewhere or the matched op should
+                # be replaced by it.
+                rewriter.insert_op_after_matched_op(intermediate)
+                return self.s2(intermediate, rewriter)
+
+    class CreateConst(CallableRewritePattern):
+        def __call__(self, op: Operation, rewriter: PatternRewriter) -> Operation:
+            if isinstance(op, Constant):
+                new_constant = Constant.from_int_constant(43, i32)
+                return new_constant
+
+    class RewriteConst(CallableRewritePattern):
+
+        def __call__(self, op: Operation, rewriter: PatternRewriter) -> Operation:
+            if isinstance(op, Constant):
+                result = Seq(CreateConst(), CreateConst())(op, rewriter)
+                rewriter.replace_matched_op([result])
+                return result
 
     rewrite_and_compare(
         prog, expected,
