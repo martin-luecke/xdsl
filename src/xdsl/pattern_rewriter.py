@@ -324,6 +324,19 @@ class RewritePattern(ABC):
         ...
 
 
+class CallableRewritePattern(RewritePattern):
+    """
+    test
+    """
+
+    @abstractmethod
+    def __call__(self, op: Operation, rewriter: PatternRewriter) -> Operation:
+        ...
+
+    def match_and_rewrite(self, op : Operation, rewriter: PatternRewriter):
+        self.__call__(op, rewriter)
+
+
 @dataclass(eq=False, repr=False)
 class AnonymousRewritePattern(RewritePattern):
     """
