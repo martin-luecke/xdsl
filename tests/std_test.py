@@ -22,6 +22,20 @@ module() {
     %21 : !i32 = std.call(%20 : !i32) ["callee" = @rec] 
     std.return(%21 :!i32)
   }
+
+  builtin.func() ["sym_name" = "br", "type" = !fun<[!i32], [!i32]>, "sym_visibility" = "private"]
+  {
+  ^2(%22: !i32):
+    std.br(%22: !i32)(^2)
+  }
+
+  builtin.func() ["sym_name" = "cond_br", "type" = !fun<[!i32], [!i32]>, "sym_visibility" = "private"]
+  {
+  ^3(%23 : !i32):
+    std.cond_br(%23 : !i32, %23 : !i32, %23 : !i32)(^3, ^4)
+  ^4(%24 : !i32, %25 : !i32):
+    std.return(%23 : !i32)
+  }
 }
 """
 

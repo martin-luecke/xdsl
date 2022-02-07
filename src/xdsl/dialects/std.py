@@ -12,6 +12,8 @@ class Std:
     def __post_init__(self):
         self.ctx.register_op(Call)
         self.ctx.register_op(Return)
+        self.ctx.register_op(Branch)
+        self.ctx.register_op(ConditionalBranch)
 
 
 @irdl_op_definition
@@ -41,3 +43,25 @@ class Return(Operation):
     @staticmethod
     def get(*ops: Union[Operation, SSAValue]) -> Return:
         return Return.build(operands=[[op for op in ops]])
+
+
+@irdl_op_definition
+class Branch(Operation):
+    name: str = "std.br"
+    arguments = VarOperandDef(AnyAttr())
+
+    @staticmethod
+    def get(*ops: Union[Operation, SSAValue], successor=Block) -> Branch:
+        return Branch.build(operands=[[op for op in ops]], successor=[Block])
+
+
+@irdl_op_definition
+class ConditionalBranch(Operation):
+    name: str = "std.cond_br"
+    arguments = VarOperandDef(AnyAttr())
+
+    @staticmethod
+    def get(*ops: Union[Operation, SSAValue],
+            successors=List[Block]) -> ConditionalBranch:
+        return Branch.build(operands=[[op for op in ops]],
+                            successors=successors)
