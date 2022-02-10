@@ -53,7 +53,6 @@ def test_fail():
 
     module = parse(prog)
     rr = fail()(module, Rewriter())
-    
     assert rr.result == "fail Strategy applied"
 
 
@@ -66,3 +65,66 @@ def test_seq():
     module = parse(prog)
     rr = seq(id(), id())(module, Rewriter())
     compare(rr.result, prog)
+
+
+def test_seq_fail():
+    prog = \
+"""module() {
+  %0 : !i32 = arith.constant() ["value" = 42 : !i32]
+}"""
+
+    module = parse(prog)
+    rr = seq(fail(), id())(module, Rewriter())
+    assert rr.result == "fail Strategy applied"
+
+
+@dataclass
+class NewConstAfterConst(Strategy):
+    """ 
+    Rewrite matches on arith.constant and adds another arith.constant after it
+    with the specified int value.
+    """
+    value: int
+
+    def impl(self, op: Operation, rewriter: Rewriter) -> RewriteResult:
+        if isinstance(op, Constant):
+            new_constant = Constant.from_int_constant(self.value, i32)
+            rew = PatternRewriter(op)
+            rew.insert_op_after_matched_op(new_constant)
+            return success(new_constant)
+        return failure("could not match constant")
+
+
+def test_topDown_insert_const():
+    prog = \
+"""module() {
+  %0 : !i32 = arith.constant() ["value" = 42 : !i32]
+}"""
+
+    expected = \
+"""module() {
+  %0 : !i32 = arith.constant() ["value" = 42 : !i32]
+  %1 : !i32 = arith.constant() ["value" = 1 : !i32]
+}"""
+
+    module = parse(prog)
+    rr = topDown(NewConstAfterConst(1))(module, Rewriter())
+    compare(module, expected)
+
+
+def test_seq_insert_const():
+    prog = \
+"""module() {
+  %0 : !i32 = arith.constant() ["value" = 42 : !i32]
+}"""
+
+    expected = \
+"""module() {
+  %0 : !i32 = arith.constant() ["value" = 42 : !i32]
+  %1 : !i32 = arith.constant() ["value" = 1 : !i32]
+  %2 : !i32 = arith.constant() ["value" = 2 : !i32]
+}"""
+
+    module = parse(prog)
+    rr = topDown(seq(NewConstAfterConst(1), NewConstAfterConst(2)))(module, Rewriter())
+    compare(module, expected)

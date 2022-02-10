@@ -15,14 +15,14 @@ class RewriteResult:
     result: Optional[Operation, str]
 
     def flatMapSuccess(self, s: Strategy, rewriter: Rewriter) -> RewriteResult:
-        if (self.result == None):
+        if (not isinstance(self.result, Operation)):
             return self
         return s(self.result, rewriter)
 
     def flatMapFailure(self, f: Callable) -> RewriteResult:
-        if (self.result == None):
+        if (not isinstance(self.result, Operation)):
             return f()
-        return self.result
+        return self
 
 
 def success(op: Operation):
@@ -82,3 +82,35 @@ class leftChoice(Strategy):
 
     def impl(self, op: Operation, rewriter: PatternRewriter) -> RewriteResult:
         return self.s1(op, rewriter).flatMapFailure(lambda : self.s2(op, rewriter))
+
+
+@dataclass
+class try_(Strategy):
+    s: Strategy
+
+    def impl(self, op: Operation, rewriter: PatternRewriter) -> RewriteResult:
+        return leftChoice(self.s, id())(op, rewriter)
+
+
+@dataclass
+class one(Strategy):
+    s: Strategy
+
+    def impl(self, op: Operation, rewriter: PatternRewriter) -> RewriteResult:
+        if isinstance(op, ModuleOp):
+            module: ModuleOp = op
+            return self.s(module.ops[0], rewriter)
+        for operand in reversed(op.operands):
+            if (isinstance(operand, OpResult)):
+                rr = self.s(operand.op, rewriter)
+                if isinstance(rr.result, Operation):
+                    return rr
+        return failure("one traversal failure")
+
+
+@dataclass
+class topDown(Strategy):
+    s: Strategy
+
+    def impl(self, op: Operation, rewriter: PatternRewriter) -> RewriteResult:
+        return leftChoice(self.s, one(topDown(self.s)))(op, rewriter)
