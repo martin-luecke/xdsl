@@ -145,20 +145,15 @@ def test_two_consts():
   %2 : !i32 = arith.addi(%0 : !i32, %0 : !i32)
 }"""
 
-    class CreateConst(CallableRewritePattern):
-        def __call__(self, op: Operation, rewriter: PatternRewriter) -> Operation:
-            if isinstance(op, Constant):
-                new_constant = Constant.from_int_constant(43, i32)
-                return new_constant
-
-
     class RewriteConst(CallableRewritePattern):
 
         def __call__(self, op: Operation, rewriter: PatternRewriter) -> Operation:
             if isinstance(op, Constant):
-                new_constant0 = CreateConst()(op, rewriter)
-                new_constant1 = CreateConst()(op, rewriter)
-                # rewriter.insert_op_after(new_constant1, op) does not work, but should. Instead:
+                new_constant0 = Constant.from_int_constant(43, i32)
+                new_constant1 = Constant.from_int_constant(43, i32)
+                # rewriter.insert_op_after(new_constant1, op) 
+                # rewriter.insert_op_after(op, new_constant1)
+                # both do not work, but should. Instead:
                 rewriter.insert_op_after_matched_op(new_constant1)
                 rewriter.replace_matched_op([new_constant0])
                 return new_constant0
